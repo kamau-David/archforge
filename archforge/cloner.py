@@ -5,7 +5,15 @@ so it can be analyzed by the rest of ArchForge.
 
 import subprocess
 import shutil
+import stat
 from pathlib import Path
+
+
+def _remove_readonly(func, path, exc_info):
+    """Handler for shutil.rmtree: clears the read-only bit and retries.
+    Needed because git repos contain read-only files on Windows."""
+    Path(path).chmod(stat.S_IWRITE)
+    func(path)
 
 
 def clone_repo(repo_url: str, workdir: str = "workspace") -> Path:
@@ -21,7 +29,7 @@ def clone_repo(repo_url: str, workdir: str = "workspace") -> Path:
 
     if target_path.exists():
         print(f"[cloner] '{target_path}' already exists — removing for a fresh clone.")
-        shutil.rmtree(target_path)
+        shutil.rmtree(target_path, onexc=_remove_readonly)
 
     print(f"[cloner] Cloning {repo_url} into {target_path} ...")
     result = subprocess.run(
