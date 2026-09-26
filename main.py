@@ -37,10 +37,18 @@ def extract_assistant_reply(raw_bob_output: str) -> str:
             content = "\n".join(lines[1:]).strip()  # drop the "Assistant (N) <timestamp>" header
             assistant_segments.append(content)
 
-    if not assistant_segments:
-        return raw_bob_output.strip()
+    reply = assistant_segments[-1] if assistant_segments else raw_bob_output.strip()
 
-    return assistant_segments[-1]
+    # Strip terminal OSC-8 hyperlink escape sequences. Bob's CLI makes file
+    # paths clickable in a real terminal using the form:
+    #   ]8;;<url>\<label>]8;;\
+    # (sometimes with real ESC/BEL bytes, sometimes just the visible
+    # "]8;;" text when the terminal doesn't render them). As captured
+    # plain text these leak through as garbage — keep just the label.
+    reply = re.sub(r'\]8;;[^\\]*\\([^\]]*)\]8;;\\?', r'\1', reply)
+    reply = re.sub(r'\x1b\]8;;[^\x07\x1b]*(?:\x07|\x1b\\)', '', reply)
+
+    return reply
 
 
 def run_pipeline(repo_url: str):
